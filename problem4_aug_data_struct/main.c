@@ -1,19 +1,87 @@
 #include <stdio.h>
+#include <stdlib.h>
 
-int main() {
-    // Agument Data Structure
-    // Problem 4: Implement a data structure that can store a list of integers
-    // and supports the following operations:
-    // 1. Insert an integer at the end of the list
-    // 2. Remove an integer from the list
-    // 3. Get the integer at a specific index in the list
-    // 4. Get the size of the list
-    // 5. Check if the list is empty
-    // 6. Clear the list
-    // 7. Print the list
-    // 8. Sort the list in ascending order
-    // 9. Sort the list in descending order
-    // 10. Find the maximum integer in the list     
-    // TODO: Implement this problem's solution
+typedef struct {
+    int *data;
+    int size;
+    int capacity;
+} IntList;
+
+void initList(IntList *list) {
+    list->capacity = 4;
+    list->size = 0;
+    list->data = (int *)malloc(sizeof(int) * list->capacity);
+}
+
+void resizeList(IntList *list) {
+    list->capacity *= 2;
+    list->data = (int *)realloc(list->data, sizeof(int) * list->capacity);
+}
+
+void insert(IntList *list, int value) {
+    if (list->size == list->capacity)
+        resizeList(list);
+    list->data[list->size++] = value;
+}
+
+int removeItem(IntList *list, int value) {
+    for (int i = 0; i < list->size; i++) {
+        if (list->data[i] == value) {
+            for (int j = i; j < list->size - 1; j++)
+                list->data[j] = list->data[j + 1];
+            list->size--;
+            return 1;
+        }
+    }
     return 0;
+}
+
+int get(IntList *list, int index) {
+    if (index >= 0 && index < list->size)
+        return list->data[index];
+    printf("Index out of bounds\n");
+    return -1;
+}
+
+int getSize(IntList *list) {
+    return list->size;
+}
+
+int isEmpty(IntList *list) {
+    return list->size == 0;
+}
+
+void clear(IntList *list) {
+    list->size = 0;
+}
+
+
+int compareAsc(const void *a, const void *b) {
+    return (*(int *)a - *(int *)b);
+}
+
+int compareDesc(const void *a, const void *b) {
+    return (*(int *)b - *(int *)a);
+}
+
+void sortAscending(IntList *list) {
+    qsort(list->data, list->size, sizeof(int), compareAsc);
+}
+
+void sortDescending(IntList *list) {
+    qsort(list->data, list->size, sizeof(int), compareDesc);
+}
+
+int findMax(IntList *list) {
+    if (list->size == 0) return -1;
+    int max = list->data[0];
+    for (int i = 1; i < list->size; i++)
+        if (list->data[i] > max)
+            max = list->data[i];
+    return max;
+}
+
+void freeList(IntList *list) {
+    free(list->data);
+    list->data = NULL;
 }
