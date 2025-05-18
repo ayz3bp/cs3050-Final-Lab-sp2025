@@ -1,125 +1,78 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <stdbool.h>
 
-// Define an edge in the adjacency list
+// Define an edge
 typedef struct Edge {
     int to;
     int weight;
     struct Edge* next;
 } Edge;
 
-// Define a graph structure
-typedef struct Graph {
-    int V;          // Number of vertices
-    Edge** adjList; // Adjacency list
-} Graph;
+// Add edge to adjacency list
+void addEdge(Edge** adjList, int from, int to, int weight) {
+    Edge* newEdge = malloc(sizeof(Edge));
+    newEdge->to = to;
+    newEdge->weight = weight;
+    newEdge->next = adjList[from];
+    adjList[from] = newEdge;
+}
 
-// Create a new graph with V vertices
-Graph* createGraph(int V) {
-    Graph* graph = (Graph*)malloc(sizeof(Graph));
-    graph->V = V;
-    graph->adjList = (Edge**)malloc(V * sizeof(Edge*));
-    
-    // Initialize adjacency lists as empty
-    for (int i = 0; i < V; i++) {
-        graph->adjList[i] = NULL;
+// Find the best edge from new vertex to MST
+int findBestEdge(int mstSize, Edge* newEdges, int* toNode, int* bestWeight) {
+    *bestWeight = INT_MAX;
+    *toNode = -1;
+    Edge* curr = newEdges;
+    while (curr != NULL) {
+        if (curr->to < mstSize && curr->weight < *bestWeight) {
+            *bestWeight = curr->weight;
+            *toNode = curr->to;
+        }
+        curr = curr->next;
     }
-    
-    return graph;
+    return *toNode != -1;
 }
 
-// Add an edge to the graph (undirected)
-void addEdge(Graph* graph, int src, int dest, int weight) {
-    // Add edge from src to dest
-    Edge* newEdge = (Edge*)malloc(sizeof(Edge));
-    newEdge->to = dest;
-    newEdge->weight = weight;
-    newEdge->next = graph->adjList[src];
-    graph->adjList[src] = newEdge;
-    
-    // Add edge from dest to src (since the graph is undirected)
-    newEdge = (Edge*)malloc(sizeof(Edge));
-    newEdge->to = src;
-    newEdge->weight = weight;
-    newEdge->next = graph->adjList[dest];
-    graph->adjList[dest] = newEdge;
-}
+int main() {
+    // Example: MST with 3 vertices
+    int mstSize = 3;
+    Edge* mstAdjList[10] = {NULL};
 
-// Print the graph adjacency list
-void printGraph(Graph* graph) {
-    for (int v = 0; v < graph->V; v++) {
-        Edge* temp = graph->adjList[v];
-        printf("Vertex %d: ", v);
-        while (temp) {
-            printf("-> %d (%d) ", temp->to, temp->weight);
-            temp = temp->next;
+    // Existing MST edges (example)
+    addEdge(mstAdjList, 0, 1, 1);
+    addEdge(mstAdjList, 1, 0, 1);
+    addEdge(mstAdjList, 1, 2, 2);
+    addEdge(mstAdjList, 2, 1, 2);
+
+    // New vertex (vertex 3) and its edges
+    Edge* newEdges = NULL;
+    Edge* newAdjList[10] = {NULL}; // include new vertex
+    addEdge(&newEdges, 0, 3, 4); // from 3 to 0
+    addEdge(&newEdges, 1, 3, 3); // from 3 to 1
+    addEdge(&newEdges, 2, 3, 6); // from 3 to 2
+
+    // Find minimal edge to MST
+    int toNode, weight;
+    if (findBestEdge(mstSize, newEdges, &toNode, &weight)) {
+        printf("Connecting new vertex 3 to MST using edge (%d - 3) with weight %d\n", toNode, weight);
+        addEdge(mstAdjList, 3, toNode, weight);
+        addEdge(mstAdjList, toNode, 3, weight);
+        mstSize++; // updated MST size
+    } else {
+        printf("New vertex is not connected to any node in MST.\n");
+    }
+
+    // Print MST
+    printf("Updated MST:\n");
+    for (int i = 0; i < mstSize; i++) {
+        printf("Vertex %d:", i);
+        Edge* curr = mstAdjList[i];
+        while (curr != NULL) {
+            printf(" -> (%d, %d)", curr->to, curr->weight);
+            curr = curr->next;
         }
         printf("\n");
     }
-}
 
-// Find if an edge exists in the MST
-bool edgeExists(Graph* mst, int src, int dest) {
-    Edge* temp = mst->adjList[src];
-    while (temp) {
-        if (temp->to == dest) {
-            return true;
-        }
-        temp = temp->next;
-    }
-    return false;
-}
-
-// Structure to represent a new edge for consideration
-typedef struct {
-    int src;
-    int dest;
-    int weight;
-} NewEdge;
-
-// Function to update MST when a new vertex and its incident edges are added
-Graph* updateMST(Graph* mst, int newVertex, NewEdge* newEdges, int numNewEdges) {
-    // Create a new MST with one more vertex
-    Graph* newMST = createGraph(mst->V + 1);
-    
-    // Copy the existing MST
-    for (int v = 0; v < mst->V; v++) {
-        Edge* temp = mst->adjList[v];
-        while (temp) {
-            if (v < temp->to) { // Avoid adding edges twice
-                addEdge(newMST, v, temp->to, temp->weight);
-            }
-            temp = temp->next;
-        }
-    }
-    
-    // Special case: If the new vertex has no edges
-    if (numNewEdges == 0) {
-        // New vertex is isolated, just add it to the MST (no edges)
-        return newMST;
-    }
-    
-    // Find the minimum weight edge connecting the new vertex to the existing MST
-    int minWeight = INT_MAX;
-    int minEdgeIndex = -1;
-    
-    for (int i = 0; i < numNewEdges; i++) {
-        if (newEdges[i].src == newVertex && newEdges[i].dest < mst->V && newEdges[i].weight < minWeight) {
-            minWeight = newEdges[i].weight;
-            minEdgeIndex = i;
-        }
-    }
-    
-    // Special case: If the new vertex is not connected to any existing vertex
-    if (minEdgeIndex == -1) {
-        // New vertex is disconnected from existing MST
-        return newMST;
-    }
-    
-    // Add the minimum weight edge to the MST
-    addEdge(newMST, newVertex, newEdges[minEdgeIndex].dest, newEdges[minEdgeIndex].weight);
-    
-    return newMST;
+    return 0;
 }
