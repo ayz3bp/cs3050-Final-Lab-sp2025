@@ -55,6 +55,11 @@ void clear(IntList *list) {
     list->size = 0;
 }
 
+void printList(IntList *list) {
+    for (int i = 0; i < list->size; i++)
+        printf("%d ", list->data[i]);
+    printf("\n");
+}
 
 int compareAsc(const void *a, const void *b) {
     return (*(int *)a - *(int *)b);
@@ -84,4 +89,34 @@ int findMax(IntList *list) {
 void freeList(IntList *list) {
     free(list->data);
     list->data = NULL;
+}
+
+int main() {
+    IntList list;
+    initList(&list);
+
+    insert(&list, 10);
+    insert(&list, 20);
+    insert(&list, 5);
+    insert(&list, 30);
+
+    printList(&list); // 10 20 5 30
+
+    removeItem(&list, 20);
+    printList(&list); // 10 5 30
+
+    printf("Index 1: %d\n", get(&list, 1)); // 5
+    printf("Max: %d\n", findMax(&list));   // 30
+
+    sortAscending(&list);
+    printList(&list); // 5 10 30
+
+    sortDescending(&list);
+    printList(&list); // 30 10 5
+
+    clear(&list);
+    printf("Empty? %s\n", isEmpty(&list) ? "Yes" : "No");
+
+    freeList(&list);
+    return 0;
 }
