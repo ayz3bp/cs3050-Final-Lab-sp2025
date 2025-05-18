@@ -2,135 +2,390 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define MAX_EDGES 100
-#define MAX_VERTICES 100
-
-typedef struct {
-    int u, v, weight;
+// Graph representation
+typedef struct Edge {
+    int src;
+    int dest;
+    int weight;
 } Edge;
 
-typedef struct AdjNode {
-    int to, weight;
-    struct AdjNode* next;
-} AdjNode;
+typedef struct Graph {
+    int V;          // Number of vertices
+    int E;          // Number of edges
+    Edge* edges;    // Array of edges
+} Graph;
 
-typedef struct {
-    AdjNode* head;
+// Adjacency list representation
+typedef struct AdjListNode {
+    int dest;
+    int weight;
+    struct AdjListNode* next;
+} AdjListNode;
+
+typedef struct AdjList {
+    AdjListNode* head;
 } AdjList;
 
-int parent[MAX_VERTICES];
+typedef struct AdjListGraph {
+    int V;
+    AdjList* array;
+} AdjListGraph;
 
-void makeSet(int n) {
-    for (int i = 0; i < n; i++)
-        parent[i] = i;
+// Structure to store MST edge order
+typedef struct EdgeOrder {
+    int src;
+    int dest;
+    int weight;
+} EdgeOrder;
+
+// Create a graph with V vertices and E edges
+Graph* createGraph(int V, int E) {
+    Graph* graph = (Graph*)malloc(sizeof(Graph));
+    graph->V = V;
+    graph->E = E;
+    graph->edges = (Edge*)malloc(E * sizeof(Edge));
+    return graph;
 }
 
-int find(int u) {
-    if (u != parent[u])
-        parent[u] = find(parent[u]);
-    return parent[u];
+// Create an adjacency list graph
+AdjListGraph* createAdjListGraph(int V) {
+    AdjListGraph* graph = (AdjListGraph*)malloc(sizeof(AdjListGraph));
+    graph->V = V;
+    graph->array = (AdjList*)malloc(V * sizeof(AdjList));
+    
+    for (int i = 0; i < V; i++)
+        graph->array[i].head = NULL;
+    
+    return graph;
 }
 
-void unionSets(int u, int v) {
-    parent[find(u)] = find(v);
+// Add an edge to the adjacency list graph
+void addEdge(AdjListGraph* graph, int src, int dest, int weight) {
+    // Add edge from src to dest
+    AdjListNode* newNode = (AdjListNode*)malloc(sizeof(AdjListNode));
+    newNode->dest = dest;
+    newNode->weight = weight;
+    newNode->next = graph->array[src].head;
+    graph->array[src].head = newNode;
+    
+    // Add edge from dest to src (undirected graph)
+    newNode = (AdjListNode*)malloc(sizeof(AdjListNode));
+    newNode->dest = src;
+    newNode->weight = weight;
+    newNode->next = graph->array[dest].head;
+    graph->array[dest].head = newNode;
 }
 
-int edgeCompare(const void* a, const void* b) {
-    Edge* ea = (Edge*)a;
-    Edge* eb = (Edge*)b;
-    return ea->weight - eb->weight;
-}
-
-int kruskalMST(Edge edges[], int numEdges, int numVertices, Edge result[]) {
-    makeSet(numVertices);
-    qsort(edges, numEdges, sizeof(Edge), edgeCompare);
-
-    int count = 0;
-    for (int i = 0; i < numEdges && count < numVertices - 1; i++) {
-        int u = edges[i].u;
-        int v = edges[i].v;
-        if (find(u) != find(v)) {
-            unionSets(u, v);
-            result[count++] = edges[i];
-        }
-    }
-    return count;
-}
-
-void primMST(AdjList* graph, int numVertices, Edge result[]) {
-    bool visited[MAX_VERTICES] = {false};
+// Convert adjacency list to edge array
+Graph* adjListToEdgeArray(AdjListGraph* adjGraph) {
+    // Count edges first (we'll only count one direction since it's undirected)
     int edgeCount = 0;
-
-    visited[0] = true; // Start from vertex 0
-
-    while (edgeCount < numVertices - 1) {
-        int minWeight = 1e9;
-        int from = -1, to = -1;
-
-        for (int u = 0; u < numVertices; u++) {
-            if (!visited[u]) continue;
-            AdjNode* node = graph[u].head;
-            while (node) {
-                if (!visited[node->to] && node->weight < minWeight) {
-                    minWeight = node->weight;
-                    from = u;
-                    to = node->to;
-                }
-                node = node->next;
+    for (int i = 0; i < adjGraph->V; i++) {
+        AdjListNode* temp = adjGraph->array[i].head;
+        while (temp) {
+            if (i < temp->dest) { // Only count edges once
+                edgeCount++;
             }
+            temp = temp->next;
         }
+    }
+    
+    // Create edge array
+    Graph* graph = createGraph(adjGraph->V, edgeCount);
+    int edgeIndex = 0;
+    
+    for (int i = 0; i < adjGraph->V; i++) {
+        AdjListNode* temp = adjGraph->array[i].head;
+        while (temp) {
+            if (i < temp->dest) { // Only add edges once
+                graph->edges[edgeIndex].src = i;
+                graph->edges[edgeIndex].dest = temp->dest;
+                graph->edges[edgeIndex].weight = temp->weight;
+                edgeIndex++;
+            }
+            temp = temp->next;
+        }
+    }
+    
+    return graph;
+}
 
-        if (to == -1) break; // Graph disconnected
+// A utility function to find the subset of an element i
+int find(int parent[], int i) {
+    if (parent[i] != i)
+        parent[i] = find(parent, parent[i]);
+    return parent[i];
+}
 
-        visited[to] = true;
-        result[edgeCount++] = (Edge){from, to, minWeight};
+// A utility function to do union of two subsets
+void Union(int parent[], int rank[], int x, int y) {
+    int rootX = find(parent, x);
+    int rootY = find(parent, y);
+
+    if (rootX == rootY) return;
+
+    if (rank[rootX] < rank[rootY])
+        parent[rootX] = rootY;
+    else if (rank[rootX] > rank[rootY])
+        parent[rootY] = rootX;
+    else {
+        parent[rootY] = rootX;
+        rank[rootX]++;
     }
 }
 
-void printEdges(Edge edges[], int count, const char* label) {
-    printf("%s Edge Order:\n", label);
-    for (int i = 0; i < count; i++) {
-        printf("(%d - %d) weight: %d\n", edges[i].u, edges[i].v, edges[i].weight);
+// Compare function for qsort to sort edges by weight
+int compareEdges(const void* a, const void* b) {
+    Edge* a1 = (Edge*)a;
+    Edge* b1 = (Edge*)b;
+    return a1->weight - b1->weight;
+}
+
+// Kruskal's algorithm to find MST
+EdgeOrder* kruskalMST(Graph* graph, int* mstSize) {
+    int V = graph->V;
+    EdgeOrder* result = (EdgeOrder*)malloc((V-1) * sizeof(EdgeOrder));
+    *mstSize = 0; // Number of edges in MST
+
+    // Step 1: Sort all edges in non-decreasing order of their weight
+    qsort(graph->edges, graph->E, sizeof(Edge), compareEdges);
+
+    // Allocate memory for creating V subsets
+    int* parent = (int*)malloc(V * sizeof(int));
+    int* rank = (int*)malloc(V * sizeof(int));
+
+    // Create V subsets with single elements
+    for (int v = 0; v < V; v++) {
+        parent[v] = v;
+        rank[v] = 0;
     }
-    printf("\n");
+
+    // Number of edges to be taken is equal to V-1
+    int e = 0; // Index used for sorted edges
+    
+    // Process edges one by one
+    while (*mstSize < V - 1 && e < graph->E) {
+        // Step 2: Pick the smallest edge
+        Edge next_edge = graph->edges[e++];
+
+        int x = find(parent, next_edge.src);
+        int y = find(parent, next_edge.dest);
+
+        // If including this edge doesn't cause cycle, include it in result
+        if (x != y) {
+            result[*mstSize].src = next_edge.src;
+            result[*mstSize].dest = next_edge.dest;
+            result[*mstSize].weight = next_edge.weight;
+            (*mstSize)++;
+            Union(parent, rank, x, y);
+        }
+    }
+
+    free(parent);
+    free(rank);
+    
+    // If MST doesn't have V-1 edges, then graph is not connected
+    if (*mstSize != V - 1) {
+        printf("Graph is not connected. Kruskal's algorithm found %d edges for MST.\n", *mstSize);
+    }
+    
+    return result;
+}
+
+// Utility function to find the vertex with minimum key value
+int minKey(int key[], bool mstSet[], int V) {
+    int min = INT_MAX, min_index;
+    
+    for (int v = 0; v < V; v++)
+        if (mstSet[v] == false && key[v] < min)
+            min = key[v], min_index = v;
+            
+    return min_index;
+}
+
+// Prim's algorithm to find MST
+EdgeOrder* primMST(AdjListGraph* graph, int* mstSize) {
+    int V = graph->V;
+    EdgeOrder* result = (EdgeOrder*)malloc((V-1) * sizeof(EdgeOrder));
+    *mstSize = 0;
+    
+    // Array to store constructed MST
+    int* parent = (int*)malloc(V * sizeof(int));
+    // Key values used to pick minimum weight edge
+    int* key = (int*)malloc(V * sizeof(int));
+    // To represent set of vertices included in MST
+    bool* mstSet = (bool*)malloc(V * sizeof(bool));
+    
+    // Initialize all keys as INFINITE
+    for (int i = 0; i < V; i++) {
+        key[i] = INT_MAX;
+        mstSet[i] = false;
+    }
+    
+    // Always include first vertex in MST
+    key[0] = 0;     // Make key 0 so that this vertex is picked as first
+    parent[0] = -1; // First node is always root of MST
+    
+    // The MST will have V vertices
+    for (int count = 0; count < V - 1; count++) {
+        // Pick the minimum key vertex from the set of vertices not yet included in MST
+        int u = minKey(key, mstSet, V);
+        
+        // If no vertex is reachable, break
+        if (key[u] == INT_MAX) {
+            printf("Graph is not connected. Prim's algorithm found %d edges for MST.\n", *mstSize);
+            break;
+        }
+        
+        // Add the picked vertex to the MST Set
+        mstSet[u] = true;
+        
+        // Add this edge to the result except for the first vertex
+        if (parent[u] != -1) {
+            result[*mstSize].src = parent[u];
+            result[*mstSize].dest = u;
+            
+            // Find the weight of this edge
+            AdjListNode* temp = graph->array[parent[u]].head;
+            while (temp) {
+                if (temp->dest == u) {
+                    result[*mstSize].weight = temp->weight;
+                    break;
+                }
+                temp = temp->next;
+            }
+            
+            (*mstSize)++;
+        }
+        
+        // Update key value and parent index of the adjacent vertices of the picked vertex
+        AdjListNode* temp = graph->array[u].head;
+        while (temp) {
+            int v = temp->dest;
+            // If v is not yet included in MST and weight of u-v is less than key[v]
+            if (mstSet[v] == false && temp->weight < key[v]) {
+                parent[v] = u;
+                key[v] = temp->weight;
+            }
+            temp = temp->next;
+        }
+    }
+    
+    free(parent);
+    free(key);
+    free(mstSet);
+    
+    return result;
+}
+
+// Compare edge orders of Prim's and Kruskal's algorithms
+void compareEdgeOrders(AdjListGraph* adjGraph) {
+    // Convert adjacency list to edge array for Kruskal's algorithm
+    Graph* edgeGraph = adjListToEdgeArray(adjGraph);
+    
+    int primMstSize, kruskalMstSize;
+    
+    // Get edge orders from both algorithms
+    EdgeOrder* primOrder = primMST(adjGraph, &primMstSize);
+    EdgeOrder* kruskalOrder = kruskalMST(edgeGraph, &kruskalMstSize);
+    
+    // Print the edge orders
+    printf("\nPrim's Algorithm Edge Order:\n");
+    printf("Order\tEdge\t\tWeight\n");
+    for (int i = 0; i < primMstSize; i++) {
+        printf("%d\t(%d-%d)\t\t%d\n", i+1, primOrder[i].src, primOrder[i].dest, primOrder[i].weight);
+    }
+    
+    printf("\nKruskal's Algorithm Edge Order:\n");
+    printf("Order\tEdge\t\tWeight\n");
+    for (int i = 0; i < kruskalMstSize; i++) {
+        printf("%d\t(%d-%d)\t\t%d\n", i+1, kruskalOrder[i].src, kruskalOrder[i].dest, kruskalOrder[i].weight);
+    }
+    
+    // Compare the two orders
+    if (primMstSize != kruskalMstSize) {
+        printf("\nThe two algorithms found different MSTs (different number of edges).\n");
+    } else {
+        printf("\nComparison of Edge Orders:\n");
+        
+        // Sort both edge sets by weight for clearer comparison
+        int sameEdges = 0;
+        for (int i = 0; i < primMstSize; i++) {
+            bool found = false;
+            for (int j = 0; j < kruskalMstSize; j++) {
+                if ((primOrder[i].src == kruskalOrder[j].src && primOrder[i].dest == kruskalOrder[j].dest) ||
+                    (primOrder[i].src == kruskalOrder[j].dest && primOrder[i].dest == kruskalOrder[j].src)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) sameEdges++;
+        }
+        
+        printf("Edges in common: %d out of %d\n", sameEdges, primMstSize);
+        
+        if (sameEdges == primMstSize) {
+            printf("Both algorithms found the same set of edges, but possibly in different orders.\n");
+        } else {
+            printf("The algorithms found different sets of edges for the MST.\n");
+        }
+    }
+    
+    // Clean up
+    free(primOrder);
+    free(kruskalOrder);
+    free(edgeGraph->edges);
+    free(edgeGraph);
 }
 
 int main() {
-    int numVertices = 4;
-
-    // Define edges
-    Edge edges[] = {
-        {0, 1, 1},
-        {0, 2, 4},
-        {1, 2, 2},
-        {1, 3, 5},
-        {2, 3, 3}
-    };
-    int numEdges = sizeof(edges) / sizeof(edges[0]);
-
-    // Build adjacency list
-    AdjList graph[MAX_VERTICES] = {0};
-    for (int i = 0; i < numEdges; i++) {
-        AdjNode* n1 = malloc(sizeof(AdjNode));
-        n1->to = edges[i].v;
-        n1->weight = edges[i].weight;
-        n1->next = graph[edges[i].u].head;
-        graph[edges[i].u].head = n1;
-
-        AdjNode* n2 = malloc(sizeof(AdjNode));
-        n2->to = edges[i].u;
-        n2->weight = edges[i].weight;
-        n2->next = graph[edges[i].v].head;
-        graph[edges[i].v].head = n2;
+    // Create a sample graph for testing
+    int V = 5; // Number of vertices
+    AdjListGraph* graph = createAdjListGraph(V);
+    
+    // Add edges to the graph
+    addEdge(graph, 0, 1, 2);
+    addEdge(graph, 0, 3, 6);
+    addEdge(graph, 1, 2, 3);
+    addEdge(graph, 1, 3, 8);
+    addEdge(graph, 1, 4, 5);
+    addEdge(graph, 2, 4, 7);
+    addEdge(graph, 3, 4, 9);
+    
+    printf("Comparing edge orders of Prim's and Kruskal's algorithms:\n");
+    compareEdgeOrders(graph);
+    
+    // Example with a disconnected graph
+    printf("\n\nTesting with a disconnected graph:\n");
+    AdjListGraph* disconnectedGraph = createAdjListGraph(5);
+    addEdge(disconnectedGraph, 0, 1, 1);
+    addEdge(disconnectedGraph, 2, 3, 2);
+    // Vertices 0,1 and 2,3 form disconnected components
+    compareEdgeOrders(disconnectedGraph);
+    
+    // Example with a complete graph
+    printf("\n\nTesting with a complete graph:\n");
+    AdjListGraph* completeGraph = createAdjListGraph(4);
+    addEdge(completeGraph, 0, 1, 10);
+    addEdge(completeGraph, 0, 2, 6);
+    addEdge(completeGraph, 0, 3, 5);
+    addEdge(completeGraph, 1, 2, 15);
+    addEdge(completeGraph, 1, 3, 4);
+    addEdge(completeGraph, 2, 3, 8);
+    compareEdgeOrders(completeGraph);
+    
+    // Clean up memory
+    // Free adjacency list
+    for (int i = 0; i < V; i++) {
+        AdjListNode* temp = graph->array[i].head;
+        while (temp) {
+            AdjListNode* next = temp->next;
+            free(temp);
+            temp = next;
+        }
     }
-
-    Edge primOrder[MAX_EDGES], kruskalOrder[MAX_EDGES];
-
-    int kruskalCount = kruskalMST(edges, numEdges, numVertices, kruskalOrder);
-    primMST(graph, numVertices, primOrder);
-
-    printEdges(kruskalOrder, kruskalCount, "Kruskal");
-    printEdges(primOrder, numVertices - 1, "Prim");
-
+    free(graph->array);
+    free(graph);
+    
     return 0;
 }
