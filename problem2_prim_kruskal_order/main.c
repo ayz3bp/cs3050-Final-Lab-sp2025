@@ -87,3 +87,50 @@ void primMST(AdjList* graph, int numVertices, Edge result[]) {
     }
 }
 
+void printEdges(Edge edges[], int count, const char* label) {
+    printf("%s Edge Order:\n", label);
+    for (int i = 0; i < count; i++) {
+        printf("(%d - %d) weight: %d\n", edges[i].u, edges[i].v, edges[i].weight);
+    }
+    printf("\n");
+}
+
+int main() {
+    int numVertices = 4;
+
+    // Define edges
+    Edge edges[] = {
+        {0, 1, 1},
+        {0, 2, 4},
+        {1, 2, 2},
+        {1, 3, 5},
+        {2, 3, 3}
+    };
+    int numEdges = sizeof(edges) / sizeof(edges[0]);
+
+    // Build adjacency list
+    AdjList graph[MAX_VERTICES] = {0};
+    for (int i = 0; i < numEdges; i++) {
+        AdjNode* n1 = malloc(sizeof(AdjNode));
+        n1->to = edges[i].v;
+        n1->weight = edges[i].weight;
+        n1->next = graph[edges[i].u].head;
+        graph[edges[i].u].head = n1;
+
+        AdjNode* n2 = malloc(sizeof(AdjNode));
+        n2->to = edges[i].u;
+        n2->weight = edges[i].weight;
+        n2->next = graph[edges[i].v].head;
+        graph[edges[i].v].head = n2;
+    }
+
+    Edge primOrder[MAX_EDGES], kruskalOrder[MAX_EDGES];
+
+    int kruskalCount = kruskalMST(edges, numEdges, numVertices, kruskalOrder);
+    primMST(graph, numVertices, primOrder);
+
+    printEdges(kruskalOrder, kruskalCount, "Kruskal");
+    printEdges(primOrder, numVertices - 1, "Prim");
+
+    return 0;
+}
